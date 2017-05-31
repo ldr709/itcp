@@ -9,7 +9,7 @@
 ##
 ################################################################################
 
-# Utility functions
+## Utility functions
 
 if not IsBound(DeepCopy_lol) then
 DeepCopy_lol:=function(lol)
@@ -1926,16 +1926,959 @@ grNKKSet:=function(n,k,A)
   return grA;
 end;
 
-repNKKSet:=function(n,k,A)
-  local grA;
+#repNKKSet:=function(n,k,A)
+#  local grA;
+#  grA:=grNKKSet(n,k,A);
+#  IntersectSet(grA,Set(NKKStorageVars(k,k)));
+#  if Size(grA)>= k then
+#    return ["B"];
+#  else
+#    return A;
+#  fi;
+#end;
+
+###new functions for NKK repair by Yirui ##########
+# main function
+
+
+
+
+
+
+
+NKKset2int_givenlist:=function(s,list)
+local i,j,k;
+  i:=0;
+  for j in s do
+  k:=Position(list,j);
+  i:=i+2^(k-1);
+  od;
+  return i;
+end;
+
+NKKint2set_anylist:=function(int, list)
+local k,q,r,i,index, A, set, Binary;
+k:=int;
+Binary:=[];
+while k>0 do
+r:=k mod 2;
+k:=QuoInt(k,2);
+Append(Binary,[r]);
+od;
+index:=[];
+for i in [0..Size(Binary)-1] do
+Append(index,[Size(Binary)-1]);
+od;
+SortParallel(index,Binary);
+A:=Positions(Binary,1);
+set:=[];
+for i in [1..Size(A)] do
+Append(set,[list[A[i]]]);
+od;
+return set;
+end;
+
+NKKOrbit:=function(n,k)
+local Var, o, canonical,i;
+Var:=NKKVars(n,k);
+# find the orbits
+o:=OrbitsDomain(SymmetricGroup(n),Combinations(Var),OnNKKvarsSets);
+# compute the grow
+o:=Difference(o,[[[]]]);
+canonical:=[];
+for i in [1..Size(o)] do
+Append(canonical,[o[i][1]]);
+od;
+return [o, canonical];
+end;
+
+
+
+# NKKset2int
+NKKset2int:=function(s,n,k)
+local i,j,k1,list;
+list:=NKKVars(n,k);
+  i:=0;
+  for j in s do
+  k1:=Position(list,j);
+  i:=i+2^(k1-1);
+  od;
+  return i;
+end;
+
+#NKKint2set
+NKKint2set:=function(int,n,k)
+local k1,list,q,r,i,index, A, set, Binary;
+list:=NKKVars(n,k);
+k1:=int;
+Binary:=[];
+while k1>0 do
+r:=k1 mod 2;
+k1:=QuoInt(k1,2);
+Append(Binary,[r]);
+od;
+index:=[];
+for i in [0..Size(Binary)-1] do
+Append(index,[Size(Binary)-1]);
+od;
+SortParallel(index,Binary);
+A:=Positions(Binary,1);
+set:=[];
+for i in [1..Size(A)] do
+Append(set,[list[A[i]]]);
+od;
+return set;
+end;
+
+#record of noncanonical to canonical
+nonc2canonical:=function(orbit,n,k)
+local i, j, index1, index2, r;
+r:=rec();
+for i in [1..Size(orbit)] do
+index1:=NKKset2int(orbit[i][1],n,k);
+for j in [1..Size(orbit[i])] do
+index2:=NKKset2int(orbit[i][j],n,k);
+r.(index2):=index1;
+od;
+od;
+return r;
+end;
+
+
+
+# NKKset2int
+NKKset2int_givenlist:=function(s,list)
+local i,j,k;
+  i:=0;
+  for j in s do
+  k:=Position(list,j);
+  i:=i+2^(k-1);
+  od;
+  return i;
+end;
+
+NKKint2set_anylist:=function(int, list)
+local k,q,r,i,index, A, set, Binary;
+k:=int;
+Binary:=[];
+while k>0 do
+r:=k mod 2;
+k:=QuoInt(k,2);
+Append(Binary,[r]);
+od;
+index:=[];
+for i in [0..Size(Binary)-1] do
+Append(index,[Size(Binary)-1]);
+od;
+SortParallel(index,Binary);
+A:=Positions(Binary,1);
+set:=[];
+for i in [1..Size(A)] do
+Append(set,[list[A[i]]]);
+od;
+return set;
+end;
+
+repNKKSet:=function(n,k,A,rnonc2canonical)
+  local grA,int;
   grA:=grNKKSet(n,k,A);
-  IntersectSet(grA,Set(NKKStorageVars(k,k)));
+  int:=NKKset2int(grA,n,k);
+  IntersectSet(grA,Set(NKKStorageVars(n,k)));
   if Size(grA)>= k then
-    return ["B"];
+  return -1;
   else
-    return A;
+  return rnonc2canonical.(int);
   fi;
 end;
+
+# record of canonical set to grow set
+NKKcanonical2gr:=function(canonical,r2,n,k)
+local r, i, int, gr;
+r:=rec();
+for i in [1..Size(canonical)] do
+int:=NKKset2int(canonical[i],n,k);
+gr:=repNKKSet(n,k,canonical[i],r2);
+r.(int):=gr;
+od;
+return r;
+end;
+
+Str2Rec:=function(lset)
+  local str, str2, str3, i, list;
+  list:=[];
+  for i in [1..Size(lset)] do
+  str:=lset[i];
+  str2 := Concatenation("local a;a:=", str, ";return a;");
+  str3:=InputTextString(str2);
+  list[i]:=ReadAsFunction(str3)();
+  od;
+  return list;
+  end;
+
+ RecInverse:=function(recd)
+  local name, i;
+  name:=RecNames(recd);
+  for i in [1..Size(name)] do
+  recd.(name[i]):=recd.(name[i])*-1;
+  od;
+  return recd;
+  end;
+
+EqualRec:=function(list)
+  local list2, i, ll1, ll2, j, leq;
+  leq:=[];
+  list2:=ShallowCopy(list);
+  list2:=Set(list2);
+  for i in [1..Size(list)] do
+  ll1:=ShallowCopy(list[i]);
+  ll2:=ShallowCopy(ll1);
+  RecInverse(ll2);
+  for j in [1..Size(list2)] do
+  if ll2=list2[j] then
+  Append(leq,[ll1]);
+  list2:=Difference(list2,[ll1, ll2]);
+  break;
+  fi;
+  od;
+  od;
+  Append(list2,leq);
+  return [leq, list2];
+  end;
+
+Leq2twolist:=function(leq)
+  local i, rec1, namelist1, namelist2, name;
+  namelist1:=[];
+  namelist2:=[];
+  for i in [1..Size(leq)] do
+  rec1:=ShallowCopy(leq[i]);
+  name:=RecNames(rec1);
+  name:=RecNames(rec1);
+  name:=Str2Rec(name);
+  Append(namelist1,[name[1]]);
+  Append(namelist2,[name[2]]);
+  od;
+  return [namelist1, namelist2];
+  end;
+
+
+#NKK inequality generator
+NKKinequality_no_degerate:=function(canonical2gr,nonc2canonical,n,kk)
+local list,ii, l, ll, i, j, xi, xj, XK,  Xk, set1, set2, set3, set4, int1, int2, int3,
+int4, r1, r2, h1, h2, h3, h4, H, Co, HH, CCo, i1, j1, indicator, k1, lstr,lset,list1,cnt,nb_cnt;
+  r1:=canonical2gr;
+  r2:=nonc2canonical;
+  list:=NKKVars(n,kk);
+  #ll:=Set([]);
+  l:=[];
+  ii:=0;
+  cnt:=0;
+  nb_cnt := Binomial(n*kk+n,2)*(2^(n*kk+n-2));
+  for i in IteratorOfCombinations(list,2) do
+    xi:=i[1];
+    xj:=i[2];
+    XK:=Difference(list,i);
+    for j in [1..Size(XK)] do
+      for Xk in IteratorOfCombinations(XK,j) do
+        cnt:=cnt+1;
+        if QuoInt(cnt,1000) = 0 then
+          Display(Concatenation("Finished ",String(Float(cnt/nb_cnt)*100),"\n"));
+        fi;
+        set1:=Union(Xk,[xi]);
+        set2:=Xk;
+        set3:=Union(Xk,[xi],[xj]);
+        set4:=Union(Xk,[xj]);
+        int1:=NKKset2int(set1,n,kk);
+        int2:=NKKset2int(set2,n,kk);
+        int3:=NKKset2int(set3,n,kk);
+        int4:=NKKset2int(set4,n,kk);
+        h1:=r1.(r2.(int1));
+        h2:=r1.(r2.(int2));
+        h3:=r1.(r2.(int3));
+        h4:=r1.(r2.(int4));
+
+        if not ((h1=h3 and h2=h4) or (h1=h2 and h3=h4) )then
+          H:=[h1,h2,h3,h4];
+          Co:=[1,-1,-1,1];
+          HH:=[];
+          CCo:=[];
+          HH[1]:=H[1];
+          CCo[1]:=Co[1];
+            for i1 in [2..Size(H)] do
+              indicator:=0;
+              for j1 in [1..Size(HH)] do
+                if H[i1]=HH[j1] then
+                  CCo[j1]:=CCo[j1]+Co[i1];
+                  indicator:=1;
+                fi;
+              od;
+              if indicator=0 then
+                Append(HH,[H[i1]]);
+                Append(CCo,[Co[i1]]);
+              fi;
+            od;
+          #l:=[];
+          ii:=ii+1;
+          l[ii]:=rec();
+            for k1 in [1..Size(HH)] do
+              if HH[k1]=-1 then
+                HH[k1]:=0;
+              fi;
+              if CCo[k1]<>0 then
+                l[ii].(HH[k1]):=CCo[k1];
+              fi;
+            od;
+          #lstr := List(l,String);
+          #ll:=Union(ll,lstr);
+        fi;
+      od;
+    od;
+  od;
+
+  for i in IteratorOfCombinations(list,2) do
+    xi:=i[1];
+    xj:=i[2];
+    set1:=[xi];
+    set2:=Union([xi],[xj]);
+    set3:=[xj];
+    int1:=NKKset2int(set1,n,kk);
+    int2:=NKKset2int(set2,n,kk);
+    int3:=NKKset2int(set3,n,kk);
+    h1:=r1.(r2.(int1));
+    h2:=r1.(r2.(int2));
+    h3:=r1.(r2.(int3));
+    H:=[h1,h2,h3];
+    Co:=[1,-1,1];
+    HH:=[];
+    CCo:=[];
+    HH[1]:=H[1];
+    CCo[1]:=Co[1];
+    for i1 in [2..Size(H)] do
+      indicator:=0;
+      for j1 in [1..Size(HH)] do
+        if H[i1]=HH[j1] then
+          CCo[j1]:=CCo[j1]+Co[i1];
+          indicator:=1;
+        fi;
+      od;
+      if indicator=0 then
+        Append(HH,[H[i1]]);
+        Append(CCo,[Co[i1]]);
+      fi;
+    od;
+    ii:=ii+1;
+    l[ii]:=rec();
+    for k1 in [1..Size(HH)] do
+      if HH[k1]=-1 then
+        HH[k1]:=0;
+      fi;
+      if CCo[k1]<>0 then
+        l[ii].(HH[k1]):=CCo[k1];
+      fi;
+    od;
+    #lstr := List(l,String);
+    #ll:=Union(ll,lstr);
+  od;
+
+  for i in [1..Size(list)] do
+    xi:=list[i];
+    XK:=Difference(list,[xi]);
+    int1:=NKKset2int(list,n,kk);
+    int2:=NKKset2int(XK,n,kk);
+    h1:=r1.(r2.(int1));
+    h2:=r1.(r2.(int2));
+    if h1-h2<>0 then
+      ii:=ii+1;
+      l[ii]:=rec();
+      HH:=[h1,h2];
+      CCo:=[1,-1];
+      for k1 in [1..Size(HH)] do
+        if HH[k1]=-1 then
+          HH[k1]:=0;
+        fi;
+        l[ii].(HH[k1]):=CCo[k1];
+       od;
+       #lstr := List(l,String);
+       #ll:=Union(ll,lstr);
+    fi;
+  od;
+  lstr := List(l,String);
+  lset:=Set(lstr);
+  list1:=Str2Rec(lset);
+  return list1;
+  end;
+
+
+ NKKcanonical2grequal:=function(equalclasslists,rcanonical2gr)
+ local rname, i, r1, nclists, k, j;
+ r1:=ShallowCopy(rcanonical2gr);
+ rname:=RecNames(r1);
+  nclists:=[];
+ for k in [1..Size(equalclasslists)] do
+  nclists[k]:=Difference(equalclasslists[k],[equalclasslists[k][1]]);
+ od;
+ for i in [1..Size(rname)] do
+   for j in [1..Size(nclists)] do
+    if r1.(rname[i]) in nclists[j] then
+    r1.(rname[i]):=equalclasslists[j][1];
+    fi;
+   od;
+ od;
+ return r1;
+ end;
+
+RecNameslist:=function(reclist)
+ local i, rcnames;
+ rcnames:=[];
+ for i in [1..Size(reclist)] do
+ Append(rcnames,RecNames(reclist[i]));
+ od;
+ rcnames:=Set(rcnames);
+ return rcnames;
+ end;
+
+ Reclist2Aindex:=function(reclist)
+ local rcnames, r, i;
+ rcnames:=RecNameslist(reclist);
+ rcnames:=Str2Rec(rcnames);
+ Sort(rcnames);
+ r:=rec();
+ for i in [1..Size(rcnames)] do
+ r.(rcnames[i]):=i+2;
+ od;
+ return r;
+ end;
+
+  Reclist2Ab:=function(reclist,n,k,canonical2gr,nonc2canonical)
+ local r1,rr1,rr2,rcnames, A, column, i, a,j,alphaindex,betaindex, az, N, k1, B;
+ r1:=Reclist2Aindex(reclist);
+ rr1:=canonical2gr;
+ rr2:=nonc2canonical;
+ rcnames:=RecNameslist(reclist);
+ A:=[];
+ column:=Size(rcnames)+1;
+ a:=[];
+ for j in [1..column] do
+ Append(a,[0]);
+ od;
+ alphaindex:=rr1.(rr2.(NKKset2int([[1]],n,k)));
+ a[1]:=-1;
+ a[r1.(alphaindex)-1]:=1;
+ Append(A,[a]);
+  a:=[];
+ for j in [1..column] do
+ Append(a,[0]);
+ od;
+ betaindex:=rr1.(rr2.(NKKset2int([[1,2]],n,k)));
+ a[2]:=-1;
+ a[r1.(betaindex)-1]:=1;
+ Append(A,[a]);
+   a:=[];
+ for j in [1..column] do
+ Append(a,[0]);
+ od;
+ a[1]:=1;
+ a[2]:=1;
+ Append(A,[a]);
+ B:=[0,0,4];
+ for i in [1..Size(reclist)] do
+ a:=[];
+ for j in [1..column] do
+ Append(a,[0]);
+ od;
+ az:=ShallowCopy(reclist[i]);
+ N:=Str2Rec(RecNames(az));
+ Append(B,[0]);
+ for k1 in [1..Size(N)] do
+ if r1.(N[k1])<>3 then
+ a[r1.(N[k1])-1]:=-az.(N[k1]);
+ else
+ B[i+3]:=az.(N[k1]);
+ fi;
+ od;
+ Append(A,[a]);
+ od;
+ return [A,B];
+ end;
+
+
+
+ LinrowsandAb:=function(list,n,k,canonical2gr,nonc2canonical)
+ local aA, list2, leq, linrows, Ab, i;
+ aA:=EqualRec(list);
+ list2:=aA[2];
+ leq:=aA[1];
+ linrows:=[];
+ for i in [1..Size(list2)] do
+ if list2[i] in leq then
+ Append(linrows,[i]);
+ fi;
+ od;
+ Ab:=Reclist2Ab(list2,n,k,canonical2gr,nonc2canonical);
+ return [linrows, Ab[1], Ab[2]];
+ end;
+
+ # polyhedra genertation
+ NKKdegenerateinequality:=function(n,k)
+ local vars,ocanonical,o,canonical,r2,r1,LAb,list;
+
+ vars:=NKKVars(n,k);
+ Display("Computing Orbits\n");
+ ocanonical:=NKKOrbit(n,k);
+ o:=ocanonical[1];
+ canonical:=ocanonical[2];
+ Display("Computing nonc->c\n");
+ r2:=nonc2canonical(o,n,k);
+ Display("Computing c->gr\n");
+ r1:=NKKcanonical2gr(canonical,r2,n,k);
+ Display("Computing non-degenerate\n");
+ list:=NKKinequality_no_degerate(r1,r2,n,k);
+ Display("Computing equalitiese\n");
+ LAb:=LinrowsandAb(list,n,k,r1,r2);
+ # LAb[1] is the indices of equivalent constraints
+ # LAb[2] is the A matrix
+ # LAb[3] is the b vector
+ return LAb;
+ end;
+
+ NKKtradeoffcurve:=function(n,k)
+ local LAb,A,b,linrows,k1,G, tradeoffcurve;
+ LAb:=NKKdegenerateinequality(n,k);
+ linrows:=LAb[1];
+ A:=LAb[2];
+ b:=LAb[3];
+ k1:=2;
+ G:=Group([()]);
+ tradeoffcurve:=symCHM(A,b,linrows,k1,G,OnProjPts,OnProjIneq,false);
+ return tradeoffcurve;
+ end;
+
+if not IsBound(OrbitsDomainSorted) then
+ OrbitsDomainSorted := function(G,S,A)
+  local i,orbs, out;
+  orbs:=OrbitsDomain(G,S,A);
+  out:=[];
+  for i in [1..Size(orbs)] do
+   out[i] := ShallowCopy(orbs[i]);
+   Sort(out[i]);
+  od;
+  Sort(out);
+  return out;
+ end;
+fi;
+
+NKKIsB:=function(n,k,A)
+  local stovars;
+  # test if A has entropy equal to source entropy
+  stovars:=NKKStorageVars(n,k);
+  IntersectSet(stovars,A);
+  if Size(stovars)>=3 then
+    return true;
+  else
+    return false;
+  fi;
+end;
+
+SampleNKKIneq:=function(n,k,nn)
+  local ineq_set,V,v,s,ineq1,ineq2,Vv,s1,s2,s3,s4,i,ss,Vij,j,ij,Vrest,kk,ii,ineq,ineq_recset,v2i,ineq_recset2,nn_rec,A,b,W1idx,S12idx,idx,row;
+  ineq_set:=Set([]);
+  # generate basic ineq: 1) h>=0
+  V:=NKKVars(n,k);
+  for v in V do
+    s1:=NKKset2int(SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k,[v]),OnNKKvarsSets))[1],n,k);
+    ineq1:=rec();
+    ineq1.(s1):=1;
+    ineq_set:=Union(ineq_set,[String(ineq1)]);
+  od;
+
+  # generate basic ineq: 2) I(i,j)>=0
+  for ij in IteratorOfCombinations(NKKVars(n,k),2) do
+      i:=ij[1];
+      j:=ij[2];
+      s:=[,,];
+      ss:=[1,1,-1];
+      s[1]:= SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, [i]),OnNKKvarsSets))[1];
+      s[2]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, [j]),OnNKKvarsSets))[1];
+      s[3]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, ij),OnNKKvarsSets))[1];
+      ineq1:=rec();
+      for ii in [1..3] do
+        if NKKIsB(n,k,s[ii]) then
+          s[ii]:=-1;
+        else
+          s[ii]:=NKKset2int(s[ii],n,k);
+        fi;
+        if s[ii] in RecNamesInt(ineq1) then
+          ineq1.(s[ii]):= ineq1.(s[ii])+ss[ii];
+        else
+          ineq1.(s[ii]):=ss[ii];
+        fi;
+      od;
+      ineq_set:=Union(ineq_set,[String(ineq1)]);
+  od;
+
+  # generate basic ineq: 3) I(i,j|k)>=0
+  for ij in IteratorOfCombinations(NKKVars(n,k),2) do
+      i:=ij[1];
+      j:=ij[2];
+      Vrest:=Set(ShallowCopy(V));
+      SubtractSet(Vrest,ij);
+      for kk in Vrest do
+        Vij:=[kk];
+        s:=[,,,];
+        ss:=[1,1,-1,-1];
+        s[1]:= SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Union(Vij,[i])),OnNKKvarsSets))[1];
+        s[2]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Union(Vij,[j])),OnNKKvarsSets))[1];
+        s[4]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Vij),OnNKKvarsSets))[1];
+        s[3]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Union(Vij,[i],[j])),OnNKKvarsSets))[1];
+        ineq1:=rec();
+        for ii in [1..4] do
+          if NKKIsB(n,k,s[ii]) then
+            s[ii]:=0;
+          else
+            s[ii]:=NKKset2int(s[ii],n,k);
+          fi;
+          if s[ii] in RecNamesInt(ineq1) then
+            ineq1.(s[ii]):= ineq1.(s[ii])+ss[ii];
+          else
+            ineq1.(s[ii]):=ss[ii];
+          fi;
+        od;
+        if Size(RecNamesInt(ineq1))>1 and Set(RecSetwise(ineq1,RecNamesInt(ineq1)))<>Set([0]) then
+          ineq_set:=Union(ineq_set,[String(ineq1)]);
+        fi;
+      od;
+  od;
+
+  # generate random ineq: 3) I(i,j|K)>=0
+  while Size(ineq_set)<nn do
+    ij:=RandomCombination(NKKVars(n,k),2);
+    i:=ij[1];
+    j:=ij[2];
+    Vrest:=Set(ShallowCopy(V));
+    SubtractSet(Vrest,ij);
+    Vij:=RandomCombination(Vrest,Random(2,Size(Vrest)));
+    s:=[,,,];
+    ss:=[1,1,-1,-1];
+    s[1]:= SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Union(Vij,[i])),OnNKKvarsSets))[1];
+    s[2]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Union(Vij,[j])),OnNKKvarsSets))[1];
+    s[4]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Vij),OnNKKvarsSets))[1];
+    s[3]:=SortedList(Orbit(SymmetricGroup(n),grNKKSet(n,k, Union(Vij,[i],[j])),OnNKKvarsSets))[1];
+    ineq1:=rec();
+    for ii in [1..4] do
+      if NKKIsB(n,k,s[ii]) then
+        s[ii]:=0;
+      else
+        s[ii]:=NKKset2int(s[ii],n,k);
+      fi;
+      if s[ii] in RecNamesInt(ineq1) then
+        ineq1.(s[ii]):= ineq1.(s[ii])+ss[ii];
+      else
+        ineq1.(s[ii]):=ss[ii];
+      fi;
+    od;
+    if Size(RecNamesInt(ineq1))>1 and Set(RecSetwise(ineq1,RecNamesInt(ineq1)))<>Set([0])  then
+      ineq_set:=Union(ineq_set,[String(ineq1)]);
+    fi;
+  od;
+  v2i:=rec();
+  ineq_recset:= Str2Rec(ineq_set);
+  # construct variable set
+  V:=Set([]);
+  for r  in ineq_recset do
+    V:=Union(V,RecNamesInt(r));
+  od;
+  SubtractSet(V,[0]);
+  for i in [1..Size(V)] do
+    v2i.(V[i]):=i;
+  od;
+  # normalize variable indices
+  ineq_recset2:=[];
+  for ineq in ineq_recset do
+    ineq2:=rec();
+    for v in RecNamesInt(ineq) do
+      if v=0 then
+        ineq2.(v):=ineq.(v);
+      else
+        ineq2.(v2i.(v)):=ineq.(v);
+      fi;
+    od;
+    Append(ineq_recset2,[ineq2]);
+  od;
+  # non-negativity for each variable appearing
+  for i in [1..Size(V)] do
+    nn_rec:=rec();
+    nn_rec.(i):=1;
+    Append(ineq_recset2,[nn_rec]);
+  od;
+  # Construct a matrix with first two columns being alpha and beta
+  W1idx:=v2i.(NKKset2int(grNKKSet(n,k,[[1]]),n,k));
+  S12idx:=v2i.(NKKset2int(grNKKSet(n,k,[[1,2]]),n,k));
+  Display([W1idx,S12idx,Size(V)]);
+  A:=[Concatenation([-1],[0],ZeroMutable([1..W1idx-1]),[1],ZeroMutable([W1idx+1..Size(V)])),
+  Concatenation([0],[-1],ZeroMutable([1..S12idx-1]),[1],ZeroMutable([S12idx+1..Size(V)])),
+  Concatenation([1,1],ZeroMutable([1..Size(V)]))];
+  b:=[0,0,10];
+  for ineq in ineq_recset2 do
+    row:=ZeroMutable([1..Size(V)+2]);
+    Append(b,[0]);
+    for idx in RecNamesInt(ineq) do
+      if idx=0 then
+        b[Size(b)]:=b[Size(b)]+ineq.(idx);
+      else
+        row[idx+2]:=-ineq.(idx);
+      fi;
+    od;
+    Append(A,[row]);
+  od;
+  return [A,b];
+end;
+
+ # assumes that the argument is sorted
+if not IsBound(transportMap) then
+ transportMap := function ( Aset, D, A, AonSets, phiR, psi, transMap,OrbitTrans)
+  local z, t, Z, S, h, y, ly, lS, i, lzt,zt,lZ;
+  if Size(Aset) = 1 then
+   lZ:=Position(D,Aset[1]);
+   return transMap[lZ];
+  fi;
+  z:=Aset[Size(Aset)];
+  Z:=Difference(Aset,[Aset[Size(Aset)]]);
+  if Size(Z) = 1 then
+   lZ:=Position(D,Z[1]);
+   t:=transMap[lZ];
+  else
+   t:=transportMap(Z,D,A,AonSets,phiR,psi,transMap,OrbitTrans);
+  fi;
+
+  S:=AonSets(Z,t);
+  lS:=Position(OrbitTrans[Size(S)],S);
+  zt:=A(z,t);
+  lzt:=Position(D,zt);
+  h:=phiR[Size(S)][lS][lzt];
+  y:=A(zt,h);
+  ly:=Position(D,y);
+  if Size(psi[Size(S)][lS][ly]) = 0 then
+   return t*h;
+  else
+   return t*h*psi[Size(S)][lS][ly][1];
+  fi;
+ end;;
+fi;
+#Leiterspiel:= function(G,D,A,AonSets,nVars)
+
+ NKKCanonicalSets:=function(nn,kk,max_size)
+  local G,D,A,AonSets,nVars,O, OrbitTrans, StabMap, transMap, k, j, i, subsSize, transR, phiR, stabR,
+  tempOrbs, l, curLoc, R, lj, x, Rux, H, rl, ri, Rmrux, r, t, S, tr, lS, ltr, h, y, ly, psi;
+  G:=SymmetricGroup(nn);
+  D:=NKKVars(nn,kk);
+  A:=OnNKKvars;
+  AonSets:=OnNKKvarsSets;
+  nVars:=max_size;
+  O:=OrbitsDomainSorted(G,D,A);
+
+
+  OrbitTrans:=EmptyPlist(Size(D));
+
+  OrbitTrans[1]:=[];
+
+  StabMap:=EmptyPlist(Size(D));
+
+  StabMap[1]:=[];
+
+  transMap:=[];
+
+  for i in [1..Size(O)] do
+
+   OrbitTrans[1][i]:=[O[i][1]];
+
+   StabMap[1][i]:=Stabilizer(G,OrbitTrans[1][i][1],A);
+
+
+   for j in [1..Size(O[i])] do
+
+    k:=Position(D,O[i][j]);
+
+    transMap[k]:=RepresentativeAction(G,O[i][j],O[i][1],A);
+
+   od;
+
+  od;
+
+
+
+  psi:=[];
+
+  phiR:=[];
+
+  for subsSize in [1..nVars-1] do
+
+
+   StabMap[subsSize+1]:=[];
+
+   OrbitTrans[subsSize+1]:=[];
+
+
+   transR:=[];
+
+   phiR[subsSize]:=[];
+
+   stabR:=[];
+
+   for i in [1..Size(OrbitTrans[subsSize])] do
+
+ # calculate the transversal and transporter
+
+    transR[i]:=[];
+
+    phiR[subsSize][i]:=[];
+
+    stabR[i]:=[];
+
+    tempOrbs:=OrbitsDomainSorted(StabMap[subsSize][i],Difference(D,OrbitTrans[subsSize][i]),A);
+
+
+    for j in [1..Size(tempOrbs)] do
+
+     transR[i][j] := tempOrbs[j][1];
+
+     stabR[i][j] := Stabilizer(StabMap[subsSize][i],transR[i][j],A);
+
+
+     for k in [1..Size(tempOrbs[j])] do
+
+      l:=Position(D,tempOrbs[j][k]);
+
+      phiR[subsSize][i][l]:=RepresentativeAction(StabMap[subsSize][i],tempOrbs[j][k],tempOrbs[j][1],A);
+
+     od;
+
+    od;
+
+  od;
+
+
+  psi[subsSize]:=EmptyPlist(Size(OrbitTrans[subsSize]));
+
+  for i in [1..Size(OrbitTrans[subsSize])] do
+
+   psi[subsSize][i]:=EmptyPlist(Size(D));
+
+   for j in [1..Size(D)] do
+
+    psi[subsSize][i][j]:=[];
+
+   od;
+
+  od;
+
+
+  curLoc:=1;
+
+ #for each set R in the transversal
+
+  for i in [1..Size(OrbitTrans[subsSize])] do
+
+   R:=OrbitTrans[subsSize][i];
+
+
+ # for each x to augment it with
+
+   for j in [1..Size(transR[i])] do
+
+    lj:=Position(D,transR[i][j]);
+
+    if Size(psi[subsSize][i][lj])=0 then
+
+ # this was undefined, so go here
+
+      x:=transR[i][j];
+
+      Rux:=ShallowCopy(R);
+
+      Append(Rux,[x]);
+
+      Sort(Rux);
+
+      H:=stabR[i][j];
+
+
+ #caculate initial orbit under H in R
+
+      if Size(R)>1 then
+
+        rl:=OrbitsDomainSorted(H,R,A);
+
+      else
+
+        rl:=[R];
+
+      fi;
+
+
+      for ri in [1..Size(rl)] do
+
+        r:=rl[ri][1];
+
+        Rmrux:=Concatenation(Difference(R,[r]),[x]);
+
+        Sort(Rmrux);
+
+ # find the transporter for Rmrux
+
+        t:=transportMap(Rmrux, D, A, AonSets, phiR, psi, transMap, OrbitTrans);
+
+        S:=AonSets(Rmrux,t);
+
+ # S is now canonical representative
+
+        tr:=A(r,t);
+
+        lS:=Position(OrbitTrans[subsSize],S);
+
+        ltr:=Position(D,tr);
+
+        h:=phiR[subsSize][lS][ltr];
+
+        y:=A(tr,h);
+
+        ly:=Position(D,y);
+
+        if S=R and x=y then
+
+ # we found a new group element of H
+
+         H:=ClosureGroup(H,t*h);
+ #gap uses a right group action
+
+        else
+
+         psi[subsSize][lS][ly]:=[Inverse(t*h)];
+
+        fi;
+
+      od;
+
+       Append(OrbitTrans[subsSize+1],[Rux]);
+
+       StabMap[subsSize+1][curLoc]:=H;
+
+       curLoc:=curLoc+1;
+
+     fi;
+
+    od;
+
+   od;
+
+  od;
+
+
+  return [OrbitTrans,transMap,StabMap];
+
+ end;
+
+###################################################
+
+
 
 GenVonNeumannUnbounded:=function(n)
 # Returns [A,b] s.t. Ax<=b are the inequalities
