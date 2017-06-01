@@ -2479,7 +2479,7 @@ NKKIsB:=function(n,k,A)
 end;
 
 SampleNKKIneq:=function(n,k,nn)
-  local ineq_set,V,v,s,ineq1,ineq2,Vv,s1,s2,s3,s4,i,ss,Vij,j,ij,Vrest,kk,ii,ineq,ineq_recset,v2i,ineq_recset2,nn_rec,A,b,W1idx,S12idx,idx,row;
+  local ineq_set,V,v,s,ineq1,ineq2,Vv,s1,s2,s3,s4,i,ss,Vij,j,ij,Vrest,kk,ii,ineq,ineq_recset,v2i,r,ineq_recset2,nn_rec,A,b,W1idx,S12idx,idx,row;
   ineq_set:=Set([]);
   # generate basic ineq: 1) h>=0
   V:=NKKVars(n,k);
