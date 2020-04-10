@@ -3,7 +3,70 @@ using root priviledges. ITAP and ITCP together make the Computer Assisted Theore
 connection for the 'wget' commands below that fetch the required tarballs from the
 web. If you wish to install only one of ITAP or ITCP you can jump over the steps that
 are indicated to be specific to one of them.
-## Step 1. Create the catpit folder (common)
+# Ubuntu
+If you are on ubuntu, you can simply use ```apt``` to download most of the dependencies.
+```{r, engine='bash', count_lines}
+sudo apt-get install libgmp3-dev singular zlib1g bzip2
+```
+Then, make the directory that you're going to put everything in, and download gap.
+```{r, engine='bash', count_lines}
+mkdir catpit
+cd catpit
+wget http://www.gap-system.org/pub/gap/gap48/tar.gz/gap4r8p4_2016_06_04-12_41.tar.gz
+tar -xf gap*.tar.gz
+cd gap4r8
+./configure --with-gmp=system
+make
+```
+Now that you have a gap installation, you want to install the various GAP packages that we provide.
+```{r, engine='bash', count_lines}
+cd pkg
+git clone https://github.com/jayant91089/itap.git
+git clone https://github.com/jayant91089/itcp.git
+git clone https://github.com/jayant91089/qsopt_ex-interface.git
+git clone https://github.com/jayant91089/symchm.git
+```
+Then, you are going to download qsopt_ex, and install it to the folder qsopt_install, and then copy the header files to your include folders so that qsopt_ex-interface can find them.
+```{r, engine='bash', count_lines}
+cd ../../
+wget https://sites.google.com/site/jayantapteshomepage/home/qsopt.tar.gz
+tar -xf qsopt.tar.gz
+mkdir qsopt_install
+cd qsopt-ex-2.5.10.3
+mkdir build && cd build
+../configure --prefix=$PWD/../../qsopt_install
+make
+make install
+cd ../../
+mkdir include lib
+cp qsopt_install/include/qsopt_ex/* include/
+cp qsopt_install/lib/* lib/
+```
+Then, we want to make the executable that actually provides the interface between gap and qsopt_ex.
+```{r, engine='bash', count_lines}
+cd gap4r8/pkg/qsopt_ex-interface/
+make all
+```
+Open the ```gap/qsinterface.gi``` file inside qsopt_ex-interface directory and define a variable ```qs_exec``` to store the absolute path to the ```qsi``` executable created in the previous step. e.g.
+```{r, engine='bash', count_lines}
+qs_exec:="/home/jayant/catpit/gap4r8/pkg/qsopt_ex-interface/qsi";
+```
+Paste the following line in the ```$HOME/.bashrc``` , but first you must go back to your root directory where everything is installed (in our case ```catpit```).
+```{r, engine='bash', count_lines}
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/lib
+```
+Now, you can test things out by executing gap and loading ITCP.
+```{r, engine='bash', count_lines}
+sh gap4r8/bin/gap.sh
+```
+In the gap console type
+```{r, engine='bash', count_lines}
+gap> LoadPackage("itcp");
+```
+
+
+# Other Unix Systems
+### Step 1. Create the catpit folder (common)
 ```{r, engine='bash', count_lines}
 mkdir catpit
 cd catpit
