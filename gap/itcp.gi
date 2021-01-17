@@ -816,35 +816,19 @@ end;
 
 
 
-
-SSShareSizesUB:=function(Asets,nvars)
-end;
-
-
-SScons:=function(Asets,nvars)
-  # loop over all subsets s of [1..nvars]
-  # if s doesnt contain any set in Asets, h(s,1) = h(s) + s(1)
-  local cons,itr,s,bads,a,conlin;
+SScons:=function(Asets,Fsets,nvars)
+  local cons,a,f,conlin;
   cons:=[];
-  itr:=IteratorOfCombinations([2..nvars]);
-  for s in itr do
-    if Size(s)>0 then
-      bads:=true;
-      for a in Asets do
-        if IsSubset(s,a) then
-          bads:=false;
-          break;
-        fi;
-      od;
-      if bads=true then
-        conlin:=ZeroMutable([1..2^nvars-1]);
-        conlin[set2int(Concatenation([1],s))]:=-1;
-        conlin[set2int([1])]:=1;
-        conlin[set2int(s)]:=1;
-        Append(cons,[conlin]);
-      fi;
-    fi;
+  # If f is in Fsets, h(f,1) = h(f) + h(1). Together with shannon inequalities
+  # this implies the same equation for all subsets of f.
+  for f  in Fsets do
+    conlin:=ZeroMutable([1..2^nvars-1]);
+    conlin[set2int(Concatenation([1],f))]:=-1;
+    conlin[set2int([1])]:=1;
+    conlin[set2int(f)]:=1;
+    Append(cons,[conlin]);
   od;
+  # If a is in Asets, h(a,1) = h(a). Also implies this for all supersets of a.
   for a  in Asets do
     conlin:=ZeroMutable([1..2^nvars-1]);
     conlin[set2int(Concatenation([1],a))]:=-1;
@@ -928,9 +912,12 @@ local NSG,pset,pset_orbs,cons,conlin,orb,j;
 end;
 
 
-SSSymmetryCons:=function(Asets,nvars)
+SSSymmetryCons:=function(Asets,Fsets,nvars,imperfect)
   local SSG,pset,pset_orbs,cons,conlin,orb,j;
     SSG:=SSSymGroup(Asets,nvars);
+    if imperfect then
+      SSG:=Intersection(SSG, SSSymGroup(Fsets,nvars));
+    fi;
     # construct orbitwise inequalities
     pset:=Combinations([1..nvars]);
     pset:=pset{[2..Size(pset)]};
@@ -974,12 +961,12 @@ GGSymmetryCons:=function(G)
     return cons;
 end;
 
-SSShannonWC:=function(Asets,nvars)
+SSShannonWC:=function(Asets,Fsets,nvars)
   local ShOB,A,b,linrows,v,conineq,conlin,i,vA,sc,a;
   ShOB:=GenShannonUnBounded(nvars);
   A:=ShOB[1];
   b:=ShOB[2];
-  sc:=SScons(Asets,nvars);
+  sc:=SScons(Asets,Fsets,nvars);
   linrows:=[1..Size(sc)]+Size(A);
   Append(A,sc);
   Append(b,ZeroMutable([1..Size(sc)]));
@@ -987,7 +974,7 @@ SSShannonWC:=function(Asets,nvars)
   for a in A do
     Append(vA,[Concatenation([0],a)]);
   od;
-  for i in [1..nvars] do
+  for i in [2..nvars] do
     conineq:= ZeroMutable([1..2^nvars]);
     conineq[1]:=-1;
     conineq[set2int([i])+1]:=1;
@@ -1372,13 +1359,36 @@ end);
 
 InstallGlobalFunction(SSWorstInfoRatioLB,
 function(Asets,nvars,optargs)
-  local rlist,obj,rlist1,s,rlist2,A,b,linrows,symcons,nslist,ns,nsrec,idx,lolos,los;
-  rlist:=SSShannonWC(Asets,nvars);
+  local rlist,obj,rlist1,s,rlist2,A,b,linrows,symcons,Fsets,idx,nsrec,nslist,ns,lolos,los,itr,a,forbidden;
+  if Size(optargs)>1 then
+    Fsets:=optargs[2];
+  else
+    # default to perfect secret sharing.
+    # loop over all subsets s of [2..nvars]
+    # if s doesnt contain any set in Asets, then it should be in Fsets.
+    Fsets:=[];
+    itr:=IteratorOfCombinations([2..nvars]);
+    for s in itr do
+      if Size(s)>0 then
+        forbidden:=true;
+        for a in Asets do
+          if IsSubset(s,a) then
+            forbidden:=false;
+            break;
+          fi;
+        od;
+        if forbidden=true then
+          Append(Fsets,[s]);
+        fi;
+      fi;
+    od;
+  fi;
+  rlist:=SSShannonWC(Asets,Fsets,nvars);
   A:=rlist[1];
   b:=rlist[2];
   linrows:=rlist[3];
-  nslist:=[];
   if Size(optargs)>0 then
+    nslist:=[];
     nsrec:=optargs[1];
     for idx in RecNamesInt(nsrec) do
       lolos:=nsrec.(idx);
@@ -1390,13 +1400,13 @@ function(Asets,nvars,optargs)
         fi;
       od;
     od;
+    for ns in nslist do
+      Append(A,[Concatenation([0],ns)]);
+      Append(b,[0]);
+    od;
   fi;
-  for ns in nslist do
-    Append(A,[Concatenation([0],ns)]);
-    Append(b,[0]);
-  od;
   Display(Concatenation("Original LP dimension...",String(Size(A[1])-RankMat(A{linrows})-1)));
-  symcons:=SSSymmetryCons(Asets,nvars);
+  symcons:=SSSymmetryCons(Asets,Fsets,nvars,Size(optargs)>1);
   Display(Concatenation("LP dimension after considering symmetries...",String(Size(A[1])-RankMat(Concatenation(A{linrows},symcons))-1)));
   if Size(symcons)>0 then
     Append(linrows,[Size(A)+1..Size(A)+Size(symcons)]);
