@@ -817,8 +817,8 @@ end;
 
 
 
-SScons:=function(Asets,Fsets,nvars)
-  local cons,a,f,conlin;
+SScons:=function(Asets,Fsets,nvars,independent_shares)
+  local cons,a,f,conlin,sanitized_i;
   cons:=[];
   # If f is in Fsets, h(f,1) = h(f) + h(1). Together with shannon inequalities
   # this implies the same equation for all subsets of f.
@@ -836,6 +836,17 @@ SScons:=function(Asets,Fsets,nvars)
     conlin[set2int(a)]:=1;
     Append(cons,[conlin]);
   od;
+  # Independent shares must be independent of the dealer and of each other.
+  # h(1, indep. shares) = h(1) + h(indep share 1) + ...
+  if Size(independent_shares)>0 then
+    conlin:=ZeroMutable([1..2^nvars-1]);
+    conlin[set2int(Union([1],independent_shares))]:=-1;
+    conlin[set2int([1])]:=1;
+    for a in independent_shares do
+      conlin[set2int([a])]:=1;
+    od;
+    Append(cons,[conlin]);
+  fi;
   return cons;
 end;
 
@@ -913,11 +924,14 @@ local NSG,pset,pset_orbs,cons,conlin,orb,j;
 end;
 
 
-SSSymmetryCons:=function(Asets,Fsets,nvars,imperfect)
+SSSymmetryCons:=function(Asets,Fsets,nvars,independent_shares,imperfect)
   local SSG,pset,pset_orbs,cons,conlin,orb,j;
     SSG:=SSSymGroup(Asets,nvars);
     if imperfect then
       SSG:=Intersection(SSG, SSSymGroup(Fsets,nvars));
+    fi;
+    if Size(independent_shares)>0 then
+      SSG:=Stabilizer(SSG,independent_shares,OnSets);
     fi;
     # construct orbitwise inequalities
     pset:=Combinations([1..nvars]);
@@ -962,12 +976,12 @@ GGSymmetryCons:=function(G)
     return cons;
 end;
 
-SSShannonWC:=function(Asets,Fsets,nvars)
+SSShannonWC:=function(Asets,Fsets,nvars,independent_shares)
   local ShOB,A,b,linrows,v,conineq,conlin,i,vA,sc,a;
   ShOB:=GenShannonUnBounded(nvars);
   A:=ShOB[1];
   b:=ShOB[2];
-  sc:=SScons(Asets,Fsets,nvars);
+  sc:=SScons(Asets,Fsets,nvars,independent_shares);
   linrows:=[1..Size(sc)]+Size(A);
   Append(A,sc);
   Append(b,ZeroMutable([1..Size(sc)]));
@@ -1360,7 +1374,7 @@ end);
 
 InstallGlobalFunction(SSWorstInfoRatioLB,
 function(Asets,nvars,optargs)
-  local rlist,obj,rlist1,s,rlist2,A,b,linrows,symcons,Fsets,idx,nsrec,nslist,ns,lolos,los,itr,a,forbidden;
+  local rlist,obj,rlist1,s,rlist2,A,b,linrows,symcons,Fsets,independent_shares,idx,nsrec,nslist,ns,lolos,los,itr,a,forbidden;
   if Size(optargs)>1 then
     Fsets:=optargs[2];
   else
@@ -1384,7 +1398,12 @@ function(Asets,nvars,optargs)
       fi;
     od;
   fi;
-  rlist:=SSShannonWC(Asets,Fsets,nvars);
+  if Size(optargs)>2 then
+    independent_shares:=Difference(AsSet(optargs[3]),[1]);
+  else
+    independent_shares:=[];
+  fi;
+  rlist:=SSShannonWC(Asets,Fsets,nvars,independent_shares);
   A:=rlist[1];
   b:=rlist[2];
   linrows:=rlist[3];
@@ -1407,7 +1426,7 @@ function(Asets,nvars,optargs)
     od;
   fi;
   Display(Concatenation("Original LP dimension...",String(Size(A[1])-RankMat(A{linrows})-1)));
-  symcons:=SSSymmetryCons(Asets,Fsets,nvars,Size(optargs)>1);
+  symcons:=SSSymmetryCons(Asets,Fsets,nvars,independent_shares,Size(optargs)>1);
   Display(Concatenation("LP dimension after considering symmetries...",String(Size(A[1])-RankMat(Concatenation(A{linrows},symcons))-1)));
   if Size(symcons)>0 then
     Append(linrows,[Size(A)+1..Size(A)+Size(symcons)]);
