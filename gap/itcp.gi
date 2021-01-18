@@ -58,9 +58,10 @@ if not IsBound(set2int) then
 set2int:=function(s)
   local i,j;
   i:=0;
-  for j in s do
+  for j in AsSet(s) do
     i:=i+2^(Int(j)-1);
   od;
+  Assert(0,i>0);
   return i;
 end;
 fi;
